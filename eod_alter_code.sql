@@ -18,4 +18,12 @@ ALTER TABLE `bv_eod_report`
 	ADD COLUMN `baseSalePriceOfPart` DOUBLE NULL DEFAULT NULL;
 	
 
-    
+CREATE TABLE `bv_debug_procedures_eod` (
+	`id` BIGINT(20) NOT NULL DEFAULT '0',
+	`modifiedDate` DATETIME(6) NULL DEFAULT NULL,
+	`code` VARCHAR(50) NULL DEFAULT NULL COLLATE 'utf8_general_ci',
+	`description` VARCHAR(1000) NULL DEFAULT NULL COLLATE 'utf8_general_ci'
+)
+COLLATE='utf8_general_ci'
+ENGINE=InnoDB
+;
