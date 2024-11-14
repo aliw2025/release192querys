@@ -3,16 +3,16 @@ BEGIN
     SET today = DATE_SUB(CURDATE(), INTERVAL 1 DAY);
 
 	IF considerModifyDate = 'Y' then
-		DELETE FROM bv_eod_report_copy WHERE customerOrderId IN (
+		DELETE FROM bv_eod_report WHERE customerOrderId IN (
         SELECT customerOrderId FROM bv_customer_order WHERE DATE(modifiedDate) = today
     );
    ELSE 
-		DELETE  FROM bv_eod_report_copy; 
+		DELETE  FROM bv_eod_report; 
 	END if;
 	
 	-- delete return orders if parent orders are modified 
 	IF considerModifyDate = 'Y' then
-		DELETE FROM bv_eod_report_copy  WHERE returnOrderInd='Y' and customerOrderId IN (
+		DELETE FROM bv_eod_report  WHERE returnOrderInd='Y' and customerOrderId IN (
         SELECT co.customerOrderId FROM bv_customer_order co JOIN bv_customer_order pco on co.parentCustomerOrderId = pco.customerOrderId 
  		  AND co.returnOrderInd = 'Y' AND DATE(pco.modifiedDate) = today
     );
@@ -319,30 +319,30 @@ INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VA
 -- Drop temporary tables
  INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 7");
     -- Insert data into the combined_data table
-    INSERT INTO bv_eod_report_copy
+    INSERT INTO bv_eod_report
     SELECT * FROM TempQuery1;
    
    INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 8");
 
-    INSERT INTO bv_eod_report_copy
+    INSERT INTO bv_eod_report
     SELECT * FROM TempQuery2;
 	 
 	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 9");
 
-	INSERT INTO bv_eod_report_copy
+	INSERT INTO bv_eod_report
     SELECT * FROM TempQuery3;
 	
 	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 10");
 
-	 INSERT INTO bv_eod_report_copy
+	 INSERT INTO bv_eod_report
     SELECT * FROM TempQuery4;
 	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 11");
 
-	 INSERT INTO bv_eod_report_copy
+	 INSERT INTO bv_eod_report
     SELECT * FROM TempQuery5;
 	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 12");
 
-	INSERT INTO bv_eod_report_copy
+	INSERT INTO bv_eod_report
     SELECT * FROM TempQuery6;
 		
     -- Drop temporary tables
