@@ -3,20 +3,21 @@ BEGIN
     SET today = DATE_SUB(CURDATE(), INTERVAL 1 DAY);
 
 	IF considerModifyDate = 'Y' then
-		DELETE FROM bv_eod_report WHERE customerOrderId IN (
+		DELETE FROM bv_eod_report_copy WHERE customerOrderId IN (
         SELECT customerOrderId FROM bv_customer_order WHERE DATE(modifiedDate) = today
     );
    ELSE 
-			DELETE  FROM bv_eod_report; 
+		DELETE  FROM bv_eod_report_copy; 
 	END if;
 	
 	-- delete return orders if parent orders are modified 
 	IF considerModifyDate = 'Y' then
-		DELETE FROM bv_eod_report  WHERE returnOrderInd='Y' and customerOrderId IN (
+		DELETE FROM bv_eod_report_copy  WHERE returnOrderInd='Y' and customerOrderId IN (
         SELECT co.customerOrderId FROM bv_customer_order co JOIN bv_customer_order pco on co.parentCustomerOrderId = pco.customerOrderId 
  		  AND co.returnOrderInd = 'Y' AND DATE(pco.modifiedDate) = today
     );
     end if;
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 1");
 
     -- local
     DROP TEMPORARY TABLE IF EXISTS TempQuery1;
@@ -56,7 +57,9 @@ BEGIN
 		os.orderStatusCode,
 		st.deliveryStatusCode,
 		co.returnOrderInd,
-		null as returnOrderStatus
+		null as returnOrderStatus,
+		co.customerLvl,
+		cod.baseSalePriceOfPart
 		from 
 		bv_order_status os 
 		INNER JOIN bv_customer_order co ON os.orderStatusId = co.orderStatusId AND co.returnOrderInd = 'N' AND os.orderStatusCode IN ('PR','RR','CR') 
@@ -76,6 +79,8 @@ BEGIN
 		left JOIN bv_vendor_part vp ON vp.vendorPartId = pvp.vendorPartId
 		left JOIN bv_vendor v ON v.vendorId = vp.vendorId;
 		
+		
+		INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 2");
 	-- non local interstore
     CREATE TEMPORARY TABLE TempQuery2 AS
    select
@@ -103,7 +108,9 @@ BEGIN
 	os.orderStatusCode,
 	st.deliveryStatusCode,
 	co.returnOrderInd,
-	null as returnOrderStatus
+	null as returnOrderStatus,
+		co.customerLvl,
+		cod.baseSalePriceOfPart
    FROM 
    bv_order_status os 
    INNER JOIN bv_customer_order co ON os.orderStatusId = co.orderStatusId AND co.returnOrderInd = 'N' AND os.orderStatusCode IN ('PR','RR','CR') 
@@ -122,7 +129,7 @@ BEGIN
 	left JOIN bv_ipo_part ipo ON ipo.partInterstoreTransferId = t.partInterstoreTransferId
 	left JOIN bv_ipo po ON ipo.ipoId = po.ipoId AND po.receiveCompleteInd = 'Y';
     
-
+INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 3");
 	 -- non local non interstore
     CREATE TEMPORARY TABLE TempQuery3 AS 
     select
@@ -148,7 +155,9 @@ BEGIN
 		os.orderStatusCode,
 		st.deliveryStatusCode,
 		co.returnOrderInd,
-		null as returnOrderStatus
+		null as returnOrderStatus,
+		co.customerLvl,
+		cod.baseSalePriceOfPart
    from 
     bv_order_status os 
     INNER JOIN bv_customer_order co ON os.orderStatusId = co.orderStatusId AND co.returnOrderInd = 'N' AND os.orderStatusCode IN ('PR','RR','CR')
@@ -161,7 +170,7 @@ BEGIN
 	INNER JOIN bv_part bp ON lps.partId = bp.partId
 	INNER JOIN bv_location l ON l.locationId = co.locationId;
 	
-	
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 4");
 	-- return of the orders 
 	 CREATE TEMPORARY TABLE TempQuery4 AS
 	SELECT 
@@ -192,7 +201,9 @@ BEGIN
 		pos.orderStatusCode orderStatusCode,
 		st.deliveryStatusCode orderDeliveryStatus,
 		co.returnOrderInd,
-		os.orderStatusCode returnOrderStatus
+		os.orderStatusCode returnOrderStatus,
+		pco.customerLvl,
+		pcod.baseSalePriceOfPart
 		from 
 		bv_order_status os 
 		INNER JOIN bv_customer_order co ON os.orderStatusId = co.orderStatusId AND co.isSpecialOrder = 'Y' and co.returnOrderInd = 'Y' AND os.orderStatusCode IN ('PR','RR','CR') 
@@ -213,7 +224,7 @@ BEGIN
 		left JOIN bv_po_venpart pvp ON pvp.poVenPartId = so.poVenPartId AND pvp.poId = po.poId
 		left JOIN bv_vendor_part vp ON vp.vendorPartId = pvp.vendorPartId
 		left JOIN bv_vendor v ON v.vendorId = vp.vendorId;
-
+INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 5");
 	CREATE TEMPORARY TABLE TempQuery5 AS	
 	select
 	   bp.partId, 
@@ -240,7 +251,9 @@ BEGIN
 	pos.orderStatusCode orderStatusCode,
 	st.deliveryStatusCode orderDeliveryStatus,
 	co.returnOrderInd,
-	os.orderStatusCode as returnOrderStatus
+	os.orderStatusCode returnOrderStatus,
+	pco.customerLvl,
+	pcod.baseSalePriceOfPart
    FROM 
    bv_order_status os 
    INNER JOIN bv_customer_order co ON os.orderStatusId = co.orderStatusId AND co.returnOrderInd = 'Y' and co.isSpecialOrder='Y' AND os.orderStatusCode IN ('PR','RR','CR') 
@@ -260,7 +273,7 @@ BEGIN
 	INNER JOIN bv_location_part_stock lpsfrom ON lpsfrom.locationPartStockId = t.fromLocationPartStockId
 	left JOIN bv_ipo_part ipo ON ipo.partInterstoreTransferId = t.partInterstoreTransferId
 	left JOIN bv_ipo po ON ipo.ipoId = po.ipoId AND po.receiveCompleteInd = 'Y';
-	
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 6");
 	CREATE TEMPORARY TABLE TempQuery6 AS
 		select
 			bp.partId as partID, 
@@ -285,7 +298,9 @@ BEGIN
 			pos.orderStatusCode orderStatusCode,
 			st.deliveryStatusCode orderDeliveryStatus,
 			co.returnOrderInd,
-			os.orderStatusCode as returnOrderStatus
+			os.orderStatusCode as returnOrderStatus,
+		pco.customerLvl,
+		pcod.baseSalePriceOfPart
 		   from 
 			bv_order_status os 
 			INNER JOIN bv_customer_order co ON os.orderStatusId = co.orderStatusId AND co.returnOrderInd = 'Y' AND os.orderStatusCode IN ('PR','RR','CR') AND co.isSpecialOrder = 'N' 
@@ -302,21 +317,32 @@ BEGIN
     
 
 -- Drop temporary tables
- 
+ INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 7");
     -- Insert data into the combined_data table
-    INSERT INTO bv_eod_report
+    INSERT INTO bv_eod_report_copy
     SELECT * FROM TempQuery1;
-    
-    INSERT INTO bv_eod_report
+   
+   INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 8");
+
+    INSERT INTO bv_eod_report_copy
     SELECT * FROM TempQuery2;
-	
-	 INSERT INTO bv_eod_report
+	 
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 9");
+
+	INSERT INTO bv_eod_report_copy
     SELECT * FROM TempQuery3;
-	 INSERT INTO bv_eod_report
+	
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 10");
+
+	 INSERT INTO bv_eod_report_copy
     SELECT * FROM TempQuery4;
-	 INSERT INTO bv_eod_report
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 11");
+
+	 INSERT INTO bv_eod_report_copy
     SELECT * FROM TempQuery5;
-	 INSERT INTO bv_eod_report
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step 12");
+
+	INSERT INTO bv_eod_report_copy
     SELECT * FROM TempQuery6;
 		
     -- Drop temporary tables
@@ -326,4 +352,5 @@ BEGIN
 	DROP TEMPORARY TABLE IF EXISTS TempQuery4;
    DROP TEMPORARY TABLE IF EXISTS TempQuery5;
 	DROP TEMPORARY TABLE IF EXISTS TempQuery6;
+	INSERT INTO `bv_debug_procedures_eod` (`modifiedDate`, `code`, `description`) VALUES (UTC_TIMESTAMP(), "EOD Event", "Step end");
 END
